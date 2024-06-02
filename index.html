@@ -458,7 +458,162 @@ NPV= -276395+170200/(1+0,13)+170200/(1+0,13)^2 +  170200/(1+0,13)^3 ==125472,2 �
 	язык программирования Python;
 	фреимворк для веб-разработки Django.
 
- 
+  from django.shortcuts import render, redirect
+  from employees.models import Department, Employee
+  from django.contrib import messages
+  from django.db.models import Q
+  
+  
+  def home(request):
+      if request.user.is_authenticated:
+          main_deps = Department.objects.filter(deptype_id=1)
+          return render(request, 'home.html', {'main_deps': main_deps})
+      else:
+          return redirect('login')
+      
+  
+  
+  def show_contacts(request, d_id):
+      dep = Department.objects.get(pk=d_id)
+      sub_deps = Department.objects.filter(parent_dep=d_id).order_by('-is_main','id')
+      employees = Employee.objects.filter(department__parent_dep=d_id).order_by('-department__is_main','department_id')
+      return render(request, 'contacts.html', {'employees': employees, 'deps': sub_deps, 'dep': dep})
+  
+  
+  def search(request):
+      val = ''
+      employees = []
+      if request.method == "POST":
+          val =  request.POST["sfield"]
+          if val == '':
+              messages.success(request, ("Введите запрос!"))
+              return render(request, 'search.html', {'employees': employees})
+          else:
+              employees = Employee.objects.all().order_by('department_id')
+              res_emps = []
+              for emp in employees:
+                  if val.lower() in emp.efname.lower() or val.lower() in emp.rank.lower() or val.lower() in emp.place.title.lower() or val.lower() in emp.department.title.lower():
+                      res_emps.append(emp)    
+              return render(request, 'search.html', {'employees': employees, 'rm': res_emps, 'val': val})
+  
+  
+              from django import views
+              from django.urls import path
+              from . import views
+              
+              urlpatterns = [
+                  path('', views.home, name="home"),   
+                  path('show_contacts/<d_id>', views.show_contacts, name="show_contacts"), 
+                  path('search', views.search, name="search"),
+              ]
+              
+              from django.db import models
+from django.contrib.auth.models import User
+
+
+class DepartmentType(models.Model):
+    title = models.CharField('Название', max_length=255)
+
+    def __str__(self):
+        return self.title 
+
+    class Meta:
+        verbose_name = ('Вид подразделения')
+        verbose_name_plural = ('Виды подразделений')
+
+
+class Department(models.Model):
+    title = models.CharField('Название', max_length=255)
+    description = models.TextField('Описание', max_length=7000)
+    parent_dep = models.IntegerField(
+        'Вышестоящее подразделение', null=True, blank=True)
+    address = models.CharField(
+        'Адрес', max_length=255, null=True, blank=True)
+    deptype = models.ForeignKey(DepartmentType, verbose_name='Тип подразделения',
+                                 null=True, blank=True, on_delete=models.DO_NOTHING)
+    is_main = models.BooleanField('Руководство', null=True, blank=True)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        verbose_name = ('Отдел')
+        verbose_name_plural = ('Отделы')
+
+
+class Place(models.Model):
+    title = models.CharField('Название', max_length=255)
+    department = models.ForeignKey(
+        Department, verbose_name='Подразделение', null=True, blank=True, on_delete=models.DO_NOTHING)
+
+    def __str__(self):
+        return self.title
+
+    class Meta:
+        verbose_name = ('Должность')
+        verbose_name_plural = ('Должность')
+
+
+class Employee(models.Model):
+    efname = models.CharField('Фамилия', max_length=80)
+    ename = models.CharField('Имя', max_length=80)
+    epatronymic = models.CharField('Отчество', max_length=80, null=True)
+    place = models.ForeignKey(
+        Place, verbose_name='Должность', blank=True, null=True, on_delete=models.DO_NOTHING)
+    department = models.ForeignKey(
+        Department, verbose_name='Отдел', blank=True, null=True, on_delete=models.DO_NOTHING)
+    rank = models.CharField('Звание', max_length=80)
+    user = models.OneToOneField(
+        User, blank=True, null=True, on_delete=models.SET_NULL)
+    phone_in = models.CharField('Телефон вн.', max_length=80)
+    phone_out = models.CharField('Телефон гор.', max_length=80)
+    email = models.EmailField('Почта', max_length=255)
+    room = models.CharField('Кабинет', max_length=80)
+    comment = models.TextField('Примечание', max_length=80, null=True, blank=True)
+
+    def __str__(self):
+        return self.efname+' '+self.ename+' '+self.epatronymic
+
+    class Meta:
+        verbose_name = ('Сотрудник')
+        verbose_name_plural = ('Сотрудники')
+
+        from django.contrib import admin
+
+from employees.models import Department, DepartmentType, Employee, Place
+
+@admin.register(Department)
+class DepartmentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'description', 'parent_dep', 'deptype', 'address')
+    ordering = ('title',)
+    search_fields = ('title', 'description') 
+
+
+@admin.register(DepartmentType)
+class DepartmentTypeAdmin(admin.ModelAdmin):
+    list_display = ('title',)
+    ordering = ('title',)
+    search_fields = ('title',)   
+
+
+@admin.register(Place)
+class PlaceAdmin(admin.ModelAdmin):
+    list_display = ('title', 'department')
+    ordering = ('title',)
+    search_fields = ('title', 'department')
+
+
+@admin.register(Employee)
+class EmployeeAdmin(admin.ModelAdmin):
+    list_display = ('efname', 'ename', 'epatronymic', 'place', 
+                    'department', 'rank', 'user', 'phone_in', 'phone_out', 'email', 'room', 'comment')
+    ordering = ('efname',)
+    search_fields = ('efname', 'rank')
+   
+
+
+
+
 СПИСОК ИСПОЛЬЗОВАННЫХ ИСТОЧНИКОВ
 	Организация корпоративного телефонного справочника. URL: https://it-minsk.by/produkty/avtomatizirovannye-informatsionnye-sistemy/korporativnyj-telefonnyj-spravochnik (дата обращения: 26.05.2024).
 	Бачурина, С.С. Информационное моделирование / С.С. Бачурина. – Москва: ДМК, 2021. – 112 c.
